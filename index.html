@@ -9,7 +9,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap">
 <style>
 /* Layout: white app bar with the title; under it the view switch (全部措施 / 單一措施), then a type dropdown
-   and the measure tabs; the 3D stage fills the rest; view tools stack in the bottom-right corner */
+   and the measure dropdown under it; the 3D stage fills the rest; view tools sit in the bottom corners */
 :root{
   --bg:#f2f3f1;
   --bar:#ffffff;
@@ -42,6 +42,7 @@
   color-scheme:dark;
 }
 html,body{height:100%; margin:0}
+[hidden]{display:none !important}   /* anything hidden stays hidden, whatever its display rule */
 body{background:var(--bg); color:var(--fg); font-family:var(--font); overflow:hidden}
 button:focus-visible, select:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
 .sr{position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap}
@@ -73,7 +74,7 @@ button:focus-visible, select:focus-visible{outline:2px solid var(--accent); outl
 .seg button:hover{color:var(--fg)}
 .seg button[aria-pressed="true"]{background:var(--accent); color:var(--on-accent)}
 
-.pick{display:flex; align-items:flex-end; gap:22px; margin-top:16px; max-width:100%}
+.pick{display:flex; flex-direction:column; align-items:flex-start; gap:10px; margin-top:16px; max-width:100%}
 .pick[hidden]{display:none}
 .select{position:relative; flex:none}
 .select select{
@@ -82,18 +83,6 @@ button:focus-visible, select:focus-visible{outline:2px solid var(--accent); outl
   border:1px solid var(--line); border-radius:4px; padding:8px 40px 8px 10px; cursor:pointer;
 }
 .select svg{position:absolute; right:12px; top:50%; width:16px; height:16px; transform:translateY(-50%); color:var(--muted); pointer-events:none}
-.tabs{
-  display:flex; min-width:0; overflow-x:auto; scrollbar-width:none;
-  background:var(--tabbar); border-radius:4px 4px 0 0;
-}
-.tabs::-webkit-scrollbar{display:none}
-.tabs button{
-  flex:none; min-width:185px; box-sizing:border-box; white-space:nowrap; cursor:pointer;
-  font:400 16px/1 var(--font); color:var(--muted); background:none;
-  border:0; border-bottom:3px solid transparent; padding:16px 20px 13px;
-}
-.tabs button:hover{color:var(--fg)}
-.tabs button[aria-selected="true"]{color:var(--fg); border-bottom-color:var(--accent)}
 
 .tools{
   position:fixed; z-index:2; display:flex; flex-direction:column; gap:12px;
@@ -154,9 +143,8 @@ button:focus-visible, select:focus-visible{outline:2px solid var(--accent); outl
   #stage, #tags, .status{top:56px}
   .controls{top:68px; left:16px; right:16px}
   .seg button{font-size:15px; padding:9px 14px}
-  .pick{flex-direction:column; align-items:stretch; gap:8px; margin-top:12px}
+  .pick{align-items:stretch; gap:8px; margin-top:12px}
   .select select{width:100%}
-  .tabs button{min-width:0; font-size:14px; padding:12px 14px 10px}
   .tools{gap:8px; right:16px; bottom:calc(env(safe-area-inset-bottom, 0px) + 20px)}
   .tools button, .movedock button{width:44px; height:44px}
   .tools svg, .movedock svg{width:22px; height:22px}
@@ -217,7 +205,11 @@ button:focus-visible, select:focus-visible{outline:2px solid var(--accent); outl
       <select id="typeSel"></select>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
     </label>
-    <div class="tabs" id="tabs" role="tablist" aria-label="綠化措施"></div>
+    <label class="select">
+      <span class="sr">綠化措施</span>
+      <select id="measureSel"></select>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+    </label>
   </div>
 </div>
 
@@ -405,7 +397,7 @@ const stage = document.getElementById('stage');
 const statusEl = document.getElementById('status');
 const pickEl = document.getElementById('pick');
 const typeSel = document.getElementById('typeSel');
-const tabsEl = document.getElementById('tabs');
+const measureSel = document.getElementById('measureSel');
 const modeAllBtn = document.getElementById('modeAll');
 const modeOneBtn = document.getElementById('modeOne');
 
@@ -712,7 +704,7 @@ async function show(index, { home = false } = {}) {
   statusEl.hidden = true;
 }
 
-// ---------- view switch, type dropdown, measure tabs ----------
+// ---------- view switch, type dropdown, measure dropdown ----------
 let lastSingle = 0;
 
 function setMode(all) {
@@ -731,20 +723,19 @@ TYPES.forEach((t, i) => {
 });
 typeSel.addEventListener('change', () => show(TYPES[Number(typeSel.value)].items[0]));
 
+// the measure dropdown lists only the measures of the chosen type
 function renderTabs(typeIndex, active) {
   typeSel.value = String(typeIndex);
-  tabsEl.textContent = '';
+  measureSel.textContent = '';
   for (const i of TYPES[typeIndex].items) {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.setAttribute('role', 'tab');
-    b.setAttribute('aria-selected', String(i === active));
-    b.textContent = MEASURES[i].name;
-    b.addEventListener('click', () => { if (i !== lastSingle || overviewActive) show(i); });
-    tabsEl.appendChild(b);
-    if (i === active) b.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    const o = document.createElement('option');
+    o.value = String(i);
+    o.textContent = MEASURES[i].name;
+    measureSel.appendChild(o);
   }
+  measureSel.value = String(active);
 }
+measureSel.addEventListener('change', () => show(Number(measureSel.value)));
 
 function indexFromHash() {
   const h = (location.hash || '').replace('#', '');
