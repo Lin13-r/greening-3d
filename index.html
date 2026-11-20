@@ -1,0 +1,1148 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>綠化措施 3D 模型</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap">
+<style>
+/* Layout: white app bar with the title; under it the view switch (全部措施 / 單一措施), then a type dropdown
+   and the measure tabs; the 3D stage fills the rest; view tools stack in the bottom-right corner */
+:root{
+  --bg:#f2f3f1;
+  --bar:#ffffff;
+  --fg:#1f2a23;
+  --muted:#6f7a73;
+  --accent:#17744a;
+  --on-accent:#ffffff;
+  --surface:#ffffff;
+  --tabbar:#f8f7f5;
+  --line:#dfe3df;
+  --hover:#edf4ef;
+  --shadow:0 1px 2px rgba(20,40,30,.10), 0 2px 8px rgba(20,40,30,.08);
+  --tag-bg:rgba(255,255,255,.62);
+  --font:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#141a16; --bar:#1b231e; --fg:#e6ede8; --muted:#9aa89f; --accent:#6cc497; --on-accent:#0f2419;
+    --surface:#222b26; --tabbar:#1d2520; --line:#33403a; --hover:#2a3730;
+    --shadow:0 1px 2px rgba(0,0,0,.35), 0 2px 8px rgba(0,0,0,.25);
+    --tag-bg:rgba(20,26,22,.6);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#141a16; --bar:#1b231e; --fg:#e6ede8; --muted:#9aa89f; --accent:#6cc497; --on-accent:#0f2419;
+  --surface:#222b26; --tabbar:#1d2520; --line:#33403a; --hover:#2a3730;
+  --shadow:0 1px 2px rgba(0,0,0,.35), 0 2px 8px rgba(0,0,0,.25);
+  --tag-bg:rgba(20,26,22,.6);
+  color-scheme:dark;
+}
+html,body{height:100%; margin:0}
+body{background:var(--bg); color:var(--fg); font-family:var(--font); overflow:hidden}
+button:focus-visible, select:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+.sr{position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap}
+
+.appbar{
+  position:fixed; top:0; left:0; right:0; height:70px; z-index:3; box-sizing:border-box;
+  display:flex; align-items:center;
+  padding:0 max(32px, calc(env(safe-area-inset-left, 0px) + 16px));
+  background:var(--bar); box-shadow:0 1px 0 var(--line), 0 2px 8px rgba(20,40,30,.08);
+}
+.appbar h1{margin:0; font-size:28px; font-weight:700; letter-spacing:.04em; color:var(--accent)}
+
+#stage{position:fixed; top:70px; left:0; right:0; bottom:0}
+#stage canvas{display:block; width:100%; height:100%; cursor:grab; touch-action:none}
+#stage canvas:active{cursor:grabbing}
+
+.controls{
+  position:fixed; z-index:2; top:88px;
+  left:max(24px, calc(env(safe-area-inset-left, 0px) + 16px));
+  right:max(24px, calc(env(safe-area-inset-right, 0px) + 16px));
+  pointer-events:none;
+}
+.controls > *{pointer-events:auto}
+.seg{display:inline-flex; background:var(--surface); border-radius:6px; box-shadow:var(--shadow); overflow:hidden}
+.seg button{
+  font:500 17px/1 var(--font); color:var(--muted); background:var(--surface);
+  border:0; padding:11px 18px; cursor:pointer;
+}
+.seg button:hover{color:var(--fg)}
+.seg button[aria-pressed="true"]{background:var(--accent); color:var(--on-accent)}
+
+.pick{display:flex; align-items:flex-end; gap:22px; margin-top:16px; max-width:100%}
+.pick[hidden]{display:none}
+.select{position:relative; flex:none}
+.select select{
+  appearance:none; -webkit-appearance:none; box-sizing:border-box; width:250px;
+  font:400 16px/1.2 var(--font); color:var(--fg); background:var(--surface);
+  border:1px solid var(--line); border-radius:4px; padding:8px 40px 8px 10px; cursor:pointer;
+}
+.select svg{position:absolute; right:12px; top:50%; width:16px; height:16px; transform:translateY(-50%); color:var(--muted); pointer-events:none}
+.tabs{
+  display:flex; min-width:0; overflow-x:auto; scrollbar-width:none;
+  background:var(--tabbar); border-radius:4px 4px 0 0;
+}
+.tabs::-webkit-scrollbar{display:none}
+.tabs button{
+  flex:none; min-width:185px; box-sizing:border-box; white-space:nowrap; cursor:pointer;
+  font:400 16px/1 var(--font); color:var(--muted); background:none;
+  border:0; border-bottom:3px solid transparent; padding:16px 20px 13px;
+}
+.tabs button:hover{color:var(--fg)}
+.tabs button[aria-selected="true"]{color:var(--fg); border-bottom-color:var(--accent)}
+
+.tools{
+  position:fixed; z-index:2; display:flex; flex-direction:column; gap:12px;
+  right:max(24px, calc(env(safe-area-inset-right, 0px) + 16px));
+  bottom:calc(env(safe-area-inset-bottom, 0px) + 40px);
+}
+.tools button, .movedock button{
+  width:54px; height:54px; display:grid; place-items:center; padding:0;
+  color:var(--muted); background:var(--surface); border:0; border-radius:6px; box-shadow:var(--shadow); cursor:pointer;
+}
+.tools button:hover, .movedock button:hover{background:var(--hover); color:var(--fg)}
+.tools button[aria-pressed="true"]{background:var(--accent); color:var(--on-accent)}
+.tools svg, .movedock svg{width:26px; height:26px}
+
+/* overview: one name tag under each model */
+#tags{position:fixed; top:70px; left:0; right:0; bottom:0; pointer-events:none; overflow:hidden}
+/* rotate and move: two buttons in the bottom-left corner; each opens its own panel to the right */
+.movedock{
+  position:fixed; z-index:2; display:flex; flex-direction:column; gap:12px;
+  left:max(24px, calc(env(safe-area-inset-left, 0px) + 16px));
+  bottom:calc(env(safe-area-inset-bottom, 0px) + 40px);
+}
+.movewrap{position:relative}
+.movedock button[aria-expanded="true"], .movedock button[aria-pressed="true"]{background:var(--accent); color:var(--on-accent)}
+.rowpanel{position:absolute; left:calc(100% + 12px); top:0; display:flex; gap:8px}
+.rowpanel[hidden]{display:none}
+.pad{
+  position:absolute; left:calc(100% + 12px); bottom:0;
+  display:grid; gap:6px;
+  grid-template-columns:repeat(3, 44px); grid-template-rows:repeat(3, 44px);
+  grid-template-areas:". up ." "left . right" ". down .";
+}
+.pad[hidden]{display:none}
+.movedock .pad button{width:44px; height:44px}
+.movedock .pad svg{width:22px; height:22px}
+#mvF{grid-area:up} #mvB{grid-area:down} #mvL{grid-area:left} #mvR{grid-area:right}
+
+/* overview: a faint name label fades in above the model under the pointer */
+.tag{
+  position:absolute; left:0; top:0; pointer-events:none; white-space:nowrap;
+  font:500 13px/1 var(--font); color:var(--muted);
+  background:var(--tag-bg); border-radius:6px; padding:6px 10px;
+  backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
+  opacity:0; transition:opacity .25s ease;
+}
+.tag.on{opacity:1}
+.tag span{margin-right:4px; font-variant-numeric:tabular-nums; opacity:.75}
+@media (prefers-reduced-motion: reduce){ .tag{transition:none} }
+
+.status{
+  position:fixed; top:70px; left:0; right:0; bottom:0; margin:0; display:grid; place-items:center;
+  padding:0 24px; text-align:center; font-size:15px; color:var(--muted); pointer-events:none;
+}
+
+@media (max-width:760px){
+  .appbar{height:56px; padding:0 16px}
+  .appbar h1{font-size:22px}
+  #stage, #tags, .status{top:56px}
+  .controls{top:68px; left:16px; right:16px}
+  .seg button{font-size:15px; padding:9px 14px}
+  .pick{flex-direction:column; align-items:stretch; gap:8px; margin-top:12px}
+  .select select{width:100%}
+  .tabs button{min-width:0; font-size:14px; padding:12px 14px 10px}
+  .tools{gap:8px; right:16px; bottom:calc(env(safe-area-inset-bottom, 0px) + 20px)}
+  .tools button, .movedock button{width:44px; height:44px}
+  .tools svg, .movedock svg{width:22px; height:22px}
+  .movedock{left:16px; gap:8px; bottom:calc(env(safe-area-inset-bottom, 0px) + 20px)}
+  .rowpanel{left:calc(100% + 8px); gap:6px}
+  .pad{left:calc(100% + 8px); gap:4px; grid-template-columns:repeat(3, 40px); grid-template-rows:repeat(3, 40px)}
+  .movedock .pad button{width:40px; height:40px}
+}
+
+/* lock screen: nothing is shown until the password is right */
+.lock{position:fixed; inset:0; z-index:10; display:grid; place-items:center; background:var(--bg); padding:24px}
+.lock[hidden]{display:none}
+.lock form{
+  width:min(360px, 100%); box-sizing:border-box; background:var(--surface); border-radius:10px; box-shadow:var(--shadow);
+  padding:28px 24px 24px; display:flex; flex-direction:column; gap:14px;
+}
+.lock h2{margin:0; font-size:24px; font-weight:700; letter-spacing:.04em; color:var(--accent)}
+.lock p{margin:0; font-size:14px; color:var(--muted)}
+.lock input{
+  font:400 16px/1.2 var(--font); color:var(--fg); background:var(--surface);
+  border:1px solid var(--line); border-radius:6px; padding:10px 12px;
+}
+.lock input:focus-visible{outline:2px solid var(--accent); outline-offset:1px}
+.lock button{
+  font:500 16px/1 var(--font); color:var(--on-accent); background:var(--accent);
+  border:0; border-radius:6px; padding:12px; cursor:pointer;
+}
+.lock button[disabled]{opacity:.6; cursor:progress}
+.lock .err{color:#c0392b; min-height:1.2em}
+</style>
+</head>
+<body>
+
+<div class="lock" id="lock">
+  <form id="lockForm" autocomplete="off">
+    <h2>綠化措施</h2>
+    <p>請輸入密碼查看 3D 模型</p>
+    <label class="sr" for="pw">密碼</label>
+    <input id="pw" type="password" placeholder="密碼" required autofocus>
+    <button id="pwBtn" type="submit">進入</button>
+    <p class="err" id="pwErr" role="alert"></p>
+  </form>
+</div>
+
+<header class="appbar"><h1>綠化措施</h1></header>
+
+<div id="stage" aria-label="綠化措施的 3D 黏土模型，可拖曳旋轉、滾輪或雙指縮放"></div>
+<div id="tags" aria-hidden="true"><div class="tag" id="hoverTag"></div></div>
+
+<div class="controls">
+  <div class="seg" role="group" aria-label="檢視方式">
+    <button id="modeAll" type="button" aria-pressed="false">全部措施</button>
+    <button id="modeOne" type="button" aria-pressed="true">單一措施</button>
+  </div>
+  <div class="pick" id="pick">
+    <label class="select">
+      <span class="sr">措施類型</span>
+      <select id="typeSel"></select>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+    </label>
+    <div class="tabs" id="tabs" role="tablist" aria-label="綠化措施"></div>
+  </div>
+</div>
+
+<div class="tools" role="toolbar" aria-label="視角控制" aria-orientation="vertical">
+  <button id="reset" type="button" aria-label="重設視角" title="重設視角">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="6.5"/><circle cx="12" cy="12" r="2.2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3"/></svg>
+  </button>
+  <button id="zoomIn" type="button" aria-label="放大" title="放大">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+  </button>
+  <button id="zoomOut" type="button" aria-label="縮小" title="縮小">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"/></svg>
+  </button>
+</div>
+
+
+<div class="movedock" role="toolbar" aria-label="旋轉與移動" aria-orientation="vertical">
+  <div class="movewrap">
+    <button id="rotToggle" type="button" aria-expanded="false" aria-controls="rotPanel" aria-label="旋轉" title="旋轉">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19.5 10.5A7.8 7.8 0 0 0 5.6 7.2"/><path d="M5 3.8v3.9h3.9"/><path d="M4.5 13.5a7.8 7.8 0 0 0 13.9 3.3"/><path d="M19 20.2v-3.9h-3.9"/></svg>
+    </button>
+    <div class="rowpanel" id="rotPanel" role="group" hidden aria-label="旋轉">
+      <button id="spin" type="button" aria-pressed="false" aria-label="自動旋轉" title="自動旋轉">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3"/><path d="M19.5 3.8v3.6h-3.6"/><path d="M9.6 15.2l2.4-6.2 2.4 6.2M10.5 13h3"/></svg>
+      </button>
+      <button id="rotL" type="button" aria-label="向左轉" title="向左轉">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3"/><path d="M4.5 3.8v3.6h3.6"/></svg>
+      </button>
+      <button id="rotR" type="button" aria-label="向右轉" title="向右轉">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3"/><path d="M19.5 3.8v3.6h-3.6"/></svg>
+      </button>
+    </div>
+  </div>
+  <div class="movewrap">
+    <button id="moveToggle" type="button" aria-expanded="false" aria-controls="pad" aria-label="移動" title="移動（前後左右）">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v18M3 12h18M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3"/></svg>
+    </button>
+    <div class="pad" id="pad" role="group" hidden aria-label="移動視角（也可以用鍵盤方向鍵、滑鼠右鍵拖曳）">
+      <button id="mvF" type="button" aria-label="往前移" title="往前移">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg>
+      </button>
+      <button id="mvL" type="button" aria-label="往左移" title="往左移">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>
+      </button>
+      <button id="mvR" type="button" aria-label="往右移" title="往右移">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+      </button>
+      <button id="mvB" type="button" aria-label="往後移" title="往後移">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<p id="status" class="status">載入 3D 模型中…</p>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+// Each model is a GLB baked in Blender (light and shadow baked into one texture).
+// grass: real 3D blades grown on the up-facing surface at height y (model units = Blender metres, Y up).
+const MEASURES = [
+  {
+    hash: 'park', no: '01', name: '小型公園', kicker: '綠化措施 01・地面型',
+    file: '01_pocket_park.bin',
+    grass: {
+      y: 1.44, tol: 0.012,
+      // the path covers part of the lawn: x 0.4 ± 0.85, Blender y -4.75..1.8 (= z -1.8..4.75 here);
+      // the playground mat covers x 1.35..4.35, Blender y -4.35..-1.65 (= z 1.65..4.35 here)
+      exclude: (x, z) => (x > 0.4 - 0.91 && x < 0.4 + 0.91 && z > -1.86 && z < 5.0)
+                      || (x > 1.30 && x < 4.40 && z > 1.60 && z < 4.40),
+    },
+  },
+  {
+    hash: 'street-trees', no: '02', name: '街道喬木', kicker: '綠化措施 02・地面型',
+    file: '02_street_trees.bin',
+    grass: { y: 1.57, tol: 0.005, exclude: null },   // soil in the three tree pits (frames sit at 1.56)
+  },
+  {
+    hash: 'planting-strip', no: '03', name: '人行道植栽帶', kicker: '綠化措施 03・地面型',
+    file: '03_planting_strip.bin',
+    grass: { y: 1.61, tol: 0.005, exclude: null },   // soil in the planting strip (frame sits at 1.58)
+  },
+  {
+    hash: 'community-garden', no: '04', name: '社區農園', kicker: '綠化措施 04・地面型',
+    file: '04_community_garden.bin',
+    grass: {
+      y: 1.44, tol: 0.012,
+      // the path covers the lawn at x ±0.7, Blender y -4.75..1.65 (= z -1.65..4.75 here)
+      exclude: (x, z) => x > -0.76 && x < 0.76 && z > -1.71 && z < 5.0,
+    },
+  },
+  {
+    hash: 'rain-garden', no: '05', name: '雨水花園', kicker: '綠化措施 05・水與保水型',
+    file: '05_rain_garden.bin',
+    // basin centre: Blender (0.3, -0.75) = here x 0.3, z 0.75; the boardwalk and paths run along x -1.1..-0.1
+    grass: [
+      {   // lawn ring around the basin; the plaza sits behind it (Blender y > 1.8 = z < -1.8)
+        y: 1.44, tol: 0.006,
+        exclude: (x, z) => z < -1.75 || (x > -1.16 && x < -0.04),
+      },
+      {   // basin floor: only a band along the slope, the middle stays soil and water; blades stay green on soil
+        y: 1.24, tol: 0.006, green: true,
+        exclude: (x, z) => insideRR(x - 0.3, z - 0.75, 2.55, 0.85, 0.6) || (x > -1.16 && x < -0.04),
+      },
+    ],
+  },
+  {
+    hash: 'ecological-pond', no: '06', name: '生態水池', kicker: '綠化措施 06・水與保水型',
+    file: '06_ecological_pond.bin',
+    grass: {
+      // lawn ring around the pond; the path and deck run along x 0.8..2.4 from the front edge (z > 1.6 here)
+      y: 1.44, tol: 0.006,
+      exclude: (x, z) => x > 0.74 && x < 2.46 && z > 1.55,
+    },
+  },
+  {
+    hash: 'permeable-pavement', no: '07', name: '透水鋪面', kicker: '綠化措施 07・水與保水型',
+    file: '07_permeable_pavement.bin',
+    grass: null,   // no plants on this measure
+  },
+  {
+    hash: 'rooftop-garden', no: '08', name: '屋頂花園', kicker: '綠化措施 08・建築型',
+    file: '08_rooftop_garden.bin',
+    // roof floor at 5.84; ground cover in the deep planters at 6.24, the lawn at 5.94, the low front planter at 6.19
+    grass: [
+      {   // deep planters (back, left, right); the low front planter's wooden rim (x < 2.15, z > 1.5) sits at the same height
+        y: 6.24, tol: 0.006,
+        exclude: (x, z) => x < 2.15 && z > 1.5,
+      },
+      { y: 5.94, tol: 0.006, exclude: null },   // lawn beside the stair hut
+      {   // low front planter only; the parapet top shares this height
+        y: 6.19, tol: 0.006,
+        exclude: (x, z) => !(x > -1.36 && x < 1.99 && z > 1.65 && z < 1.99),
+      },
+    ],
+  },
+  {
+    hash: 'green-roof', no: '09', name: '屋頂綠化', kicker: '綠化措施 09・建築型',
+    file: '09_green_roof.bin',
+    // thin ground cover on the roof (roof floor 5.84, cover surface 5.96); nothing else sits at this height
+    grass: { y: 5.96, tol: 0.006, exclude: null },
+  },
+  {
+    hash: 'balcony-greening', no: '10', name: '陽台露臺立體綠化', kicker: '綠化措施 10・建築型',
+    file: '10_balcony_greening.bin',
+    grass: null,   // planters only, no lawn
+  },
+  {
+    hash: 'vertical-greening', no: '11', name: '垂直綠化', kicker: '綠化措施 11・建築型',
+    file: '11_green_wall.bin',
+    grass: null,   // green walls on the two side facades, no lawn
+  },
+];
+const BLADES_PER_UNIT = 370;
+
+// point inside a rounded rectangle centred on the origin (half sizes hx, hy, corner radius r)
+function insideRR(x, y, hx, hy, r) {
+  if (Math.abs(x) > hx || Math.abs(y) > hy) return false;
+  const qx = Math.abs(x) - (hx - r), qy = Math.abs(y) - (hy - r);
+  if (qx <= 0 || qy <= 0) return true;
+  return qx * qx + qy * qy <= r * r;
+}
+
+// the three types, each with its measures (indexes into MEASURES)
+const TYPES = [
+  { name: '地面型', items: [0, 1, 2, 3] },
+  { name: '水與保水型', items: [4, 5, 6] },
+  { name: '建築型', items: [7, 8, 9, 10] },
+];
+const typeOf = index => TYPES.findIndex(t => t.items.includes(index));
+
+const stage = document.getElementById('stage');
+const statusEl = document.getElementById('status');
+const pickEl = document.getElementById('pick');
+const typeSel = document.getElementById('typeSel');
+const tabsEl = document.getElementById('tabs');
+const modeAllBtn = document.getElementById('modeAll');
+const modeOneBtn = document.getElementById('modeOne');
+
+function hasWebGL() {
+  try {
+    const c = document.createElement('canvas');
+    return !!(c.getContext('webgl2') || c.getContext('webgl'));
+  } catch (e) { return false; }
+}
+if (!hasWebGL()) {
+  statusEl.textContent = '這個瀏覽器無法顯示 3D 模型（不支援 WebGL），請換用其他瀏覽器開啟。';
+  throw new Error('WebGL unavailable');
+}
+
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// ---------- renderer, scene, camera ----------
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.setClearColor(0x000000, 0);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 0.95;
+stage.appendChild(renderer.domElement);
+const maxAniso = renderer.capabilities.getMaxAnisotropy();
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 400);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.enablePan = true;
+controls.screenSpacePanning = false;   // pan along the ground, not up and down
+controls.panSpeed = 0.8;
+controls.minPolarAngle = 0.22;
+controls.maxPolarAngle = 1.42;
+controls.autoRotateSpeed = 1.4;
+controls.rotateSpeed = 0.8;
+
+// ---------- light: soft studio room + one sun for the ground shadow ----------
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(renderer), 0.04).texture;
+scene.add(new THREE.HemisphereLight(0xffffff, 0xbac8b2, 0.35));
+const sun = new THREE.DirectionalLight(0xfff4e6, 1.9);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.bias = -0.0004;
+sun.shadow.normalBias = 0.03;
+scene.add(sun);
+scene.add(sun.target);
+
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), new THREE.ShadowMaterial({ opacity: 0.16 }));
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+// ---------- framing ----------
+const TARGET = new THREE.Vector3(0, 2.4, 0);
+const HOME_DIR = new THREE.Vector3(1, 0.9, 1).normalize();
+let fitRadius = 7.8;
+
+function fitDistance() {
+  const vHalf = THREE.MathUtils.degToRad(camera.fov / 2);
+  const hHalf = Math.atan(Math.tan(vHalf) * camera.aspect);
+  return fitRadius / Math.sin(Math.min(vHalf, hHalf)) * 0.8;
+}
+
+function resize() {
+  const w = stage.clientWidth || window.innerWidth;
+  const h = stage.clientHeight || window.innerHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  const d = fitDistance();
+  controls.minDistance = d * 0.4;
+  controls.maxDistance = d * 1.8;
+}
+
+function placeCameraHome() {
+  controls.target.copy(TARGET);
+  camera.position.copy(TARGET).addScaledVector(HOME_DIR, fitDistance());
+  controls.update();
+}
+
+resize();
+placeCameraHome();
+new ResizeObserver(resize).observe(stage);
+
+// ---------- grass: each blade takes its colour from the baked texture right under it ----------
+function addGrass(model, cfg) {
+  let mesh = null;
+  model.traverse(o => { if (!mesh && o.isMesh && o.material && o.material.map) mesh = o; });
+  if (!mesh || !mesh.geometry.attributes.uv) return 0;
+  model.updateMatrixWorld(true);
+
+  const img = mesh.material.map.image;
+  const W = img.width, H = img.height;
+  const cv = document.createElement('canvas');
+  cv.width = W; cv.height = H;
+  const ctx = cv.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(img, 0, 0);
+  const px = ctx.getImageData(0, 0, W, H).data;
+
+  const g = mesh.geometry, pos = g.attributes.position, uv = g.attributes.uv, idx = g.index;
+  const triCount = idx ? idx.count / 3 : pos.count / 3;
+  const A = new THREE.Vector3(), B = new THREE.Vector3(), C = new THREE.Vector3();
+  const e1 = new THREE.Vector3(), e2 = new THREE.Vector3(), n = new THREE.Vector3();
+  const tris = [];
+  let total = 0;
+  for (let t = 0; t < triCount; t++) {
+    const ia = idx ? idx.getX(t * 3) : t * 3, ib = idx ? idx.getX(t * 3 + 1) : t * 3 + 1, ic = idx ? idx.getX(t * 3 + 2) : t * 3 + 2;
+    A.fromBufferAttribute(pos, ia).applyMatrix4(mesh.matrixWorld);
+    B.fromBufferAttribute(pos, ib).applyMatrix4(mesh.matrixWorld);
+    C.fromBufferAttribute(pos, ic).applyMatrix4(mesh.matrixWorld);
+    if (Math.abs(A.y - cfg.y) > cfg.tol || Math.abs(B.y - cfg.y) > cfg.tol || Math.abs(C.y - cfg.y) > cfg.tol) continue;
+    n.crossVectors(e1.subVectors(B, A), e2.subVectors(C, A));
+    const area = n.length() / 2;
+    if (area < 1e-6 || Math.abs(n.y / (area * 2)) < 0.99) continue;
+    total += area;
+    tris.push({
+      a: A.clone(), b: B.clone(), c: C.clone(),
+      ua: uv.getX(ia), va: uv.getY(ia), ub: uv.getX(ib), vb: uv.getY(ib), uc: uv.getX(ic), vc: uv.getY(ic),
+      cum: total,
+    });
+  }
+  if (!tris.length) return 0;
+  const target = Math.round(total * BLADES_PER_UNIT);
+
+  const bladeGeo = new THREE.ConeGeometry(0.022, 0.14, 3, 1);
+  bladeGeo.translate(0, 0.07, 0);
+  const bp = bladeGeo.attributes.position, shade = [];
+  for (let i = 0; i < bp.count; i++) {
+    const k = bp.getY(i) > 0.1 ? 1.12 : 0.72;   // darker at the root
+    shade.push(k, k, k);
+  }
+  bladeGeo.setAttribute('color', new THREE.Float32BufferAttribute(shade, 3));
+  const grass = new THREE.InstancedMesh(bladeGeo, new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false }), target);
+
+  const M = new THREE.Matrix4(), Q = new THREE.Quaternion(), E = new THREE.Euler();
+  const P = new THREE.Vector3(), S = new THREE.Vector3(), col = new THREE.Color();
+  let placed = 0, tries = 0;
+  while (placed < target && tries < target * 4) {
+    tries++;
+    const pick = Math.random() * total;
+    let lo = 0, hi = tris.length - 1;
+    while (lo < hi) { const mid = (lo + hi) >> 1; if (tris[mid].cum < pick) lo = mid + 1; else hi = mid; }
+    const T = tris[lo];
+    let r1 = Math.random(), r2 = Math.random();
+    if (r1 + r2 > 1) { r1 = 1 - r1; r2 = 1 - r2; }
+    const r0 = 1 - r1 - r2;
+    P.set(T.a.x * r0 + T.b.x * r1 + T.c.x * r2, cfg.y - 0.005, T.a.z * r0 + T.b.z * r1 + T.c.z * r2);
+    if (cfg.exclude && cfg.exclude(P.x, P.z)) continue;
+    const u = T.ua * r0 + T.ub * r1 + T.uc * r2;
+    const v = T.va * r0 + T.vb * r1 + T.vc * r2;
+    const x = Math.min(W - 1, Math.max(0, Math.floor(u * W)));
+    const y = Math.min(H - 1, Math.max(0, Math.floor(v * H)));
+    const p = (y * W + x) * 4;
+    if (Math.max(px[p], px[p + 1], px[p + 2]) < 40) continue;   // hidden spot (under a trunk or shrub)
+    const k = 0.88 + Math.random() * 0.24;
+    if (cfg.green) {
+      // grass on soil: keep the baked light and shadow, but colour the blade green
+      const lum = (0.3 * px[p] + 0.59 * px[p + 1] + 0.11 * px[p + 2]) / 255;
+      const shade = Math.min(1.25, Math.max(0.35, lum / 0.42)) * k;
+      col.setRGB(0.44 * shade, 0.74 * shade, 0.29 * shade, THREE.SRGBColorSpace);
+    } else {
+      col.setRGB(px[p] / 255 * k, px[p + 1] / 255 * k, px[p + 2] / 255 * k, THREE.SRGBColorSpace);
+    }
+    E.set((Math.random() - 0.5) * 0.5, Math.random() * Math.PI * 2, (Math.random() - 0.5) * 0.5);
+    Q.setFromEuler(E);
+    S.set(1, 0.7 + Math.random() * 0.5, 1);
+    M.compose(P, Q, S);
+    grass.setMatrixAt(placed, M);
+    grass.setColorAt(placed, col);
+    placed++;
+  }
+  grass.count = placed;
+  grass.instanceMatrix.needsUpdate = true;
+  if (grass.instanceColor) grass.instanceColor.needsUpdate = true;
+  model.add(grass);
+  return placed;
+}
+
+// ---------- load one measure (cached after the first time) ----------
+function formatSize(bytes) {
+  if (bytes >= 1024 * 1024) return (bytes / 1024 / 1024).toFixed(1) + ' MB';
+  return Math.round(bytes / 1024).toLocaleString('zh-TW') + ' KB';
+}
+
+const cache = new Map();
+
+async function prepare(m) {
+  const res = await fetch(m.file);
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  // models are stored encrypted (AES-GCM); they only become readable with the password's key
+  const sealed = await res.arrayBuffer();
+  const bytes = new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: sealed.slice(0, 12) }, modelKey, sealed.slice(12)));
+  const gltf = await new Promise((resolve, reject) => new GLTFLoader().parse(bytes.buffer, '', resolve, reject));
+  const model = gltf.scene;
+
+  // A baked model already carries its light and shadow in the texture, so it is shown unlit;
+  // it still casts a shadow on the ground.
+  let tris = 0, baked = false, texSize = 0;
+  model.traverse(o => {
+    if (!o.isMesh) return;
+    const g = o.geometry;
+    tris += g.index ? g.index.count / 3 : g.attributes.position.count / 3;
+    o.castShadow = true;
+    const map = o.material && o.material.map;
+    if (map) {
+      baked = true;
+      map.anisotropy = maxAniso;
+      // Small bakes have narrow margins: skip mipmaps so shrunken levels don't mix the black gaps
+      // between texture islands into the edges. Large bakes have wide margins and need mipmaps.
+      if (map.image && map.image.width < 4096) {
+        map.generateMipmaps = false;
+        map.minFilter = THREE.LinearFilter;
+        map.needsUpdate = true;
+      }
+      if (map.image) texSize = Math.max(texSize, map.image.width || 0);
+      // thin leaves are single faces: keep the GLB's double-sided setting so they show from behind too
+      o.material = new THREE.MeshBasicMaterial({ map, toneMapped: false, side: o.material.side });
+      o.receiveShadow = false;
+    } else {
+      o.receiveShadow = true;
+    }
+  });
+
+  let grassCount = 0;
+  if (baked && m.grass) {
+    // a measure may grow grass on several levels (e.g. the lawn and the floor of a sunken basin)
+    for (const cfg of (Array.isArray(m.grass) ? m.grass : [m.grass])) {
+      try { grassCount += addGrass(model, cfg); } catch (e) { console.warn('grass skipped', e); }
+    }
+  }
+
+  // sit the model on the ground, centred
+  const box = new THREE.Box3().setFromObject(model);
+  const center = box.getCenter(new THREE.Vector3());
+  model.position.x -= center.x;
+  model.position.z -= center.z;
+  model.position.y -= box.min.y;
+
+  const placed = new THREE.Box3().setFromObject(model);
+  const size = placed.getSize(new THREE.Vector3());
+  const radius = placed.getBoundingSphere(new THREE.Sphere()).radius;
+
+  return { model, radius, height: size.y, tris, baked, texSize, grassCount, bytes: bytes.length };
+}
+
+let current = null, loadToken = 0;
+
+async function show(index, { home = false } = {}) {
+  const m = MEASURES[index];
+  const token = ++loadToken;
+  overviewActive = false;
+  lastSingle = index;
+  setHover(-1);
+  setMode(false);
+  renderTabs(typeOf(index), index);
+  try { history.replaceState(null, '', '#' + m.hash); } catch (e) { /* ignore */ }
+
+  let entry = cache.get(index);
+  if (!entry) {
+    statusEl.textContent = '載入「' + m.name + '」中…';
+    statusEl.hidden = false;
+    try {
+      entry = await prepare(m);
+      cache.set(index, entry);
+    } catch (err) {
+      console.error(err);
+      if (token === loadToken) statusEl.textContent = '「' + m.name + '」載入失敗，請重新整理頁面再試一次。';
+      return;
+    }
+  }
+  if (token !== loadToken) return;   // a newer choice arrived while loading
+
+  if (current) scene.remove(current.model);
+  current = entry;
+  scene.add(entry.model);
+
+  fitRadius = entry.radius;
+  const r = entry.radius;
+  sun.position.set(r * 1.2, r * 2.1, r * 0.9);
+  Object.assign(sun.shadow.camera, { left: -r * 1.3, right: r * 1.3, top: r * 1.3, bottom: -r * 1.3, near: 0.5, far: r * 6 });
+  sun.shadow.camera.updateProjectionMatrix();
+
+  // keep the current viewing angle, refit the distance and height to the new model
+  const sph = new THREE.Spherical().setFromVector3(camera.position.clone().sub(controls.target));
+  TARGET.set(0, entry.height * 0.42, 0);
+  resize();
+  if (home) {
+    placeCameraHome();
+  } else {
+    anim = null;
+    controls.enabled = true;
+    sph.radius = fitDistance();
+    controls.target.copy(TARGET);
+    camera.position.copy(TARGET).add(new THREE.Vector3().setFromSpherical(sph));
+    controls.update();
+  }
+
+  statusEl.hidden = true;
+}
+
+// ---------- view switch, type dropdown, measure tabs ----------
+let lastSingle = 0;
+
+function setMode(all) {
+  modeAllBtn.setAttribute('aria-pressed', String(all));
+  modeOneBtn.setAttribute('aria-pressed', String(!all));
+  pickEl.hidden = all;
+}
+modeAllBtn.addEventListener('click', () => showAll());
+modeOneBtn.addEventListener('click', () => { if (overviewActive) show(lastSingle, { home: true }); });
+
+TYPES.forEach((t, i) => {
+  const o = document.createElement('option');
+  o.value = String(i);
+  o.textContent = t.name;
+  typeSel.appendChild(o);
+});
+typeSel.addEventListener('change', () => show(TYPES[Number(typeSel.value)].items[0]));
+
+function renderTabs(typeIndex, active) {
+  typeSel.value = String(typeIndex);
+  tabsEl.textContent = '';
+  for (const i of TYPES[typeIndex].items) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.setAttribute('role', 'tab');
+    b.setAttribute('aria-selected', String(i === active));
+    b.textContent = MEASURES[i].name;
+    b.addEventListener('click', () => { if (i !== lastSingle || overviewActive) show(i); });
+    tabsEl.appendChild(b);
+    if (i === active) b.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }
+}
+
+function indexFromHash() {
+  const h = (location.hash || '').replace('#', '');
+  if (h === 'all') return -1;
+  const i = MEASURES.findIndex(m => m.hash === h);
+  return i < 0 ? 0 : i;
+}
+function route(opts) {
+  const i = indexFromHash();
+  if (i < 0) showAll(opts); else show(i, opts);
+}
+window.addEventListener('hashchange', () => route());
+
+// ---------- overview: all 11 models on one board, one row per type ----------
+// Each model gets a light copy with a 1024 texture (the full 4096 textures for all 11 would need about 1 GB).
+const ROWS = TYPES.map(t => t.items);                    // 地面型, 水與保水型, 建築型
+const GAP = 12.5;                                        // a tile is 10 wide
+const overviewGroup = new THREE.Group();
+const liteCache = new Map();
+const hoverTag = document.getElementById('hoverTag');
+let overviewActive = false, overviewLoading = false;
+
+function tilePosition(index) {
+  for (let r = 0; r < ROWS.length; r++) {
+    const c = ROWS[r].indexOf(index);
+    if (c >= 0) return new THREE.Vector3((c - (ROWS[r].length - 1) / 2) * GAP, 0, (r - 1) * GAP);
+  }
+  return new THREE.Vector3();
+}
+
+function liteTexture(map) {
+  const N = 1024;
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = N;
+  cv.getContext('2d').drawImage(map.image, 0, 0, N, N);
+  const t = new THREE.CanvasTexture(cv);
+  t.flipY = map.flipY;
+  t.colorSpace = map.colorSpace;
+  t.wrapS = map.wrapS;
+  t.wrapT = map.wrapT;
+  t.anisotropy = maxAniso;
+  return t;
+}
+
+// a copy that shares the geometry but uses a smaller texture
+function makeLite(entry, index, keepFull) {
+  const lite = entry.model.clone(true);
+  lite.traverse(o => {
+    if (!o.isMesh || o.isInstancedMesh || !o.material || !o.material.map) return;
+    const full = o.material.map;
+    o.material = new THREE.MeshBasicMaterial({ map: liteTexture(full), toneMapped: false, side: o.material.side });
+    if (!keepFull) {
+      full.dispose();
+      if (full.image && full.image.close) full.image.close();
+    }
+  });
+  const p = tilePosition(index);
+  lite.position.x += p.x;
+  lite.position.z += p.z;
+  lite.userData.index = index;
+  return lite;
+}
+
+async function loadOverview() {
+  if (overviewLoading) return;
+  overviewLoading = true;
+  const order = ROWS.flat();
+  for (const i of order) {
+    if (!overviewActive) break;
+    if (liteCache.has(i)) continue;
+    statusEl.textContent = '載入全部模型中… ' + (liteCache.size + 1) + ' / ' + MEASURES.length;
+    statusEl.hidden = false;
+    try {
+      const cached = cache.get(i);
+      const entry = cached || await prepare(MEASURES[i]);
+      const lite = makeLite(entry, i, !!cached);
+      liteCache.set(i, lite);
+      overviewGroup.add(lite);
+      lite.userData.box = new THREE.Box3().setFromObject(lite);
+    } catch (err) {
+      console.error(err);
+    }
+  }
+  overviewLoading = false;
+  if (overviewActive) statusEl.hidden = liteCache.size > 0;
+  if (overviewActive && liteCache.size < MEASURES.length) {
+    statusEl.textContent = '有 ' + (MEASURES.length - liteCache.size) + ' 個模型載入失敗，請重新整理頁面再試一次。';
+    statusEl.hidden = false;
+  }
+}
+
+function showAll({ home = true } = {}) {
+  ++loadToken;
+  overviewActive = true;
+  setMode(true);
+  try { history.replaceState(null, '', '#all'); } catch (e) { /* ignore */ }
+
+  if (current) scene.remove(current.model);
+  current = { model: overviewGroup };
+  scene.add(overviewGroup);
+
+  // frame the whole board
+  const half = new THREE.Vector3(2 * GAP, 0, 1.5 * GAP);
+  fitRadius = Math.hypot(half.x, half.z) * 0.92;
+  const r = fitRadius;
+  sun.position.set(r * 1.2, r * 2.1, r * 0.9);
+  Object.assign(sun.shadow.camera, { left: -r * 1.3, right: r * 1.3, top: r * 1.3, bottom: -r * 1.3, near: 0.5, far: r * 6 });
+  sun.shadow.camera.updateProjectionMatrix();
+  TARGET.set(0, 1.5, 0);
+  resize();
+  anim = null;
+  controls.enabled = true;
+  placeCameraHome();
+
+  loadOverview();
+}
+
+// ---------- overview hover: the model under the pointer shows its name faintly ----------
+// Hit-testing uses each model's bounding box (cheap enough to run on every pointer move).
+const ray = new THREE.Raycaster(), pointer = new THREE.Vector2(), hitPoint = new THREE.Vector3();
+let pointerIn = false, dragging = false, downAt = null, hoverIdx = -1;
+
+function tileUnderPointer() {
+  ray.setFromCamera(pointer, camera);
+  let best = -1, bestD = Infinity;
+  for (const [i, lite] of liteCache) {
+    const box = lite.userData.box;
+    if (box && ray.ray.intersectBox(box, hitPoint)) {
+      const d = hitPoint.distanceToSquared(ray.ray.origin);
+      if (d < bestD) { bestD = d; best = i; }
+    }
+  }
+  return best;
+}
+
+function setHover(i) {
+  if (i === hoverIdx) return;
+  hoverIdx = i;
+  if (i >= 0) hoverTag.innerHTML = '<span>' + MEASURES[i].no + '</span>' + MEASURES[i].name;
+  hoverTag.classList.toggle('on', i >= 0);
+  renderer.domElement.style.cursor = i >= 0 ? 'pointer' : '';
+}
+
+const tagAnchor = new THREE.Vector3();
+function updateHover() {
+  if (!overviewActive) return;
+  setHover(pointerIn && !dragging ? tileUnderPointer() : -1);
+  const lite = liteCache.get(hoverIdx);
+  if (!lite) return;
+  const box = lite.userData.box;
+  tagAnchor.set((box.min.x + box.max.x) / 2, box.max.y, (box.min.z + box.max.z) / 2).project(camera);
+  const w = renderer.domElement.clientWidth, h = renderer.domElement.clientHeight;
+  const x = (tagAnchor.x * 0.5 + 0.5) * w, y = (-tagAnchor.y * 0.5 + 0.5) * h;
+  hoverTag.style.transform = 'translate(' + Math.round(x) + 'px,' + Math.round(y - 10) + 'px) translate(-50%, -100%)';
+}
+
+function setPointer(e) {
+  const rect = renderer.domElement.getBoundingClientRect();
+  pointer.set((e.clientX - rect.left) / rect.width * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
+}
+const canvasEl = renderer.domElement;
+canvasEl.addEventListener('pointermove', e => {
+  pointerIn = e.pointerType === 'mouse' || e.pointerType === 'pen';   // no hover label for touch
+  setPointer(e);
+  if (downAt && Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 6) dragging = true;
+});
+canvasEl.addEventListener('pointerleave', () => { pointerIn = false; });
+canvasEl.addEventListener('pointerdown', e => { downAt = [e.clientX, e.clientY]; dragging = false; });
+// a click (not a drag) on a model in the overview opens it
+canvasEl.addEventListener('pointerup', e => {
+  const wasDrag = dragging;
+  downAt = null;
+  dragging = false;
+  if (!overviewActive || wasDrag) return;
+  setPointer(e);
+  const i = tileUnderPointer();
+  if (i >= 0) show(i);
+});
+
+// ---------- view animations ----------
+let anim = null;
+const ease = t => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
+const lerp = (a, b, t) => a + (b - a) * t;
+
+function currentView() {
+  if (anim) return { sph: anim.to.clone(), target: anim.toTarget.clone() };
+  return {
+    sph: new THREE.Spherical().setFromVector3(camera.position.clone().sub(controls.target)),
+    target: controls.target.clone(),
+  };
+}
+
+function animateTo(toSph, toTarget) {
+  const from = new THREE.Spherical().setFromVector3(camera.position.clone().sub(controls.target));
+  let dTheta = toSph.theta - from.theta;
+  dTheta = Math.atan2(Math.sin(dTheta), Math.cos(dTheta));
+  anim = {
+    from, to: toSph, dTheta,
+    fromTarget: controls.target.clone(), toTarget: toTarget.clone(),
+    t0: performance.now(), ms: reduceMotion ? 0 : 650,
+  };
+  controls.enabled = false;
+}
+
+function stepAnim(now) {
+  if (!anim) return;
+  const t = anim.ms === 0 ? 1 : Math.min(1, (now - anim.t0) / anim.ms);
+  const e = ease(t);
+  const sph = new THREE.Spherical(
+    lerp(anim.from.radius, anim.to.radius, e),
+    lerp(anim.from.phi, anim.to.phi, e),
+    anim.from.theta + anim.dTheta * e
+  );
+  controls.target.lerpVectors(anim.fromTarget, anim.toTarget, e);
+  camera.position.copy(controls.target).add(new THREE.Vector3().setFromSpherical(sph));
+  if (t >= 1) { anim = null; controls.enabled = true; }
+}
+
+function rotateBy(angle) {
+  const v = currentView();
+  v.sph.theta += angle;
+  animateTo(v.sph, v.target);
+}
+
+// zoom keeps the viewing angle and moves the camera closer or farther, within the scroll-zoom limits
+function zoomBy(factor) {
+  const v = currentView();
+  v.sph.radius = THREE.MathUtils.clamp(v.sph.radius * factor, controls.minDistance, controls.maxDistance);
+  animateTo(v.sph, v.target);
+}
+document.getElementById('zoomIn').addEventListener('click', () => zoomBy(0.78));
+document.getElementById('zoomOut').addEventListener('click', () => zoomBy(1.28));
+
+document.getElementById('rotL').addEventListener('click', () => rotateBy(-Math.PI / 2));
+document.getElementById('rotR').addEventListener('click', () => rotateBy(Math.PI / 2));
+document.getElementById('reset').addEventListener('click', () => {
+  const home = new THREE.Spherical().setFromVector3(HOME_DIR.clone().multiplyScalar(fitDistance()));
+  animateTo(home, TARGET);
+});
+const spinBtn = document.getElementById('spin');
+spinBtn.addEventListener('click', () => {
+  controls.autoRotate = !controls.autoRotate;
+  spinBtn.setAttribute('aria-pressed', String(controls.autoRotate));
+});
+
+// ---------- move forward / back / left / right (along the ground, relative to the view) ----------
+const _fwd = new THREE.Vector3(), _right = new THREE.Vector3();
+function groundAxes() {
+  camera.getWorldDirection(_fwd);
+  _fwd.y = 0;
+  _fwd.normalize();
+  _right.crossVectors(_fwd, camera.up).normalize();
+}
+
+// keep the view centre near the models so they can't be lost off screen
+function clampTarget(t) {
+  const L = fitRadius * 1.1;
+  t.x = THREE.MathUtils.clamp(t.x, TARGET.x - L, TARGET.x + L);
+  t.z = THREE.MathUtils.clamp(t.z, TARGET.z - L, TARGET.z + L);
+  t.y = TARGET.y;
+  return t;
+}
+
+function moveBy(forward, right) {
+  const v = currentView();
+  groundAxes();
+  const step = fitRadius * 0.3;
+  const t = v.target.clone().addScaledVector(_fwd, forward * step).addScaledVector(_right, right * step);
+  animateTo(v.sph, clampTarget(t));
+}
+// the rotate and move buttons each open a panel; only one panel is open at a time
+const PANELS = [
+  [document.getElementById('rotToggle'), document.getElementById('rotPanel')],
+  [document.getElementById('moveToggle'), document.getElementById('pad')],
+];
+function openPanel(which) {
+  for (const [btn, panel] of PANELS) {
+    const open = panel === which;
+    panel.hidden = !open;
+    btn.setAttribute('aria-expanded', String(open));
+  }
+}
+for (const [btn, panel] of PANELS) btn.addEventListener('click', () => openPanel(panel.hidden ? panel : null));
+window.addEventListener('keydown', e => { if (e.key === 'Escape') openPanel(null); });
+document.getElementById('mvF').addEventListener('click', () => moveBy(1, 0));
+document.getElementById('mvB').addEventListener('click', () => moveBy(-1, 0));
+document.getElementById('mvL').addEventListener('click', () => moveBy(0, -1));
+document.getElementById('mvR').addEventListener('click', () => moveBy(0, 1));
+
+// keyboard: arrow keys or W A S D move smoothly while held
+const KEYMOVE = {
+  ArrowUp: [1, 0], w: [1, 0], W: [1, 0], ArrowDown: [-1, 0], s: [-1, 0], S: [-1, 0],
+  ArrowLeft: [0, -1], a: [0, -1], A: [0, -1], ArrowRight: [0, 1], d: [0, 1], D: [0, 1],
+};
+const held = new Set();
+window.addEventListener('keydown', e => {
+  if (!KEYMOVE[e.key] || e.altKey || e.ctrlKey || e.metaKey) return;
+  if (e.target.closest && e.target.closest('select, input, textarea')) return;
+  held.add(e.key);
+  e.preventDefault();
+});
+window.addEventListener('keyup', e => held.delete(e.key));
+window.addEventListener('blur', () => held.clear());
+
+const _off = new THREE.Vector3();
+function stepMove(dt) {
+  if (held.size && !anim) {
+    let f = 0, r = 0;
+    held.forEach(k => { f += KEYMOVE[k][0]; r += KEYMOVE[k][1]; });
+    if (f || r) {
+      groundAxes();
+      const d = fitRadius * 0.9 * dt;
+      _off.copy(camera.position).sub(controls.target);
+      controls.target.addScaledVector(_fwd, f * d).addScaledVector(_right, r * d);
+      clampTarget(controls.target);
+      camera.position.copy(controls.target).add(_off);
+    }
+  }
+  // right-drag panning is limited the same way
+  if (!anim) {
+    const tx = controls.target.x, tz = controls.target.z;
+    clampTarget(controls.target);
+    if (tx !== controls.target.x || tz !== controls.target.z) {
+      camera.position.x += controls.target.x - tx;
+      camera.position.z += controls.target.z - tz;
+    }
+  }
+}
+
+// ---------- loop ----------
+let lastNow = performance.now();
+renderer.setAnimationLoop(now => {
+  const dt = Math.min(0.05, (now - lastNow) / 1000);
+  lastNow = now;
+  stepAnim(now);
+  stepMove(dt);
+  controls.update();
+  renderer.render(scene, camera);
+  updateHover();
+});
+
+// ---------- password ----------
+const LOCK = {"salt": "nq7uhNUdY3IZBB41ECpm1w==", "iter": 310000, "check": "V0ykFyed5SIE0s4SwOh7br3b5hio8UkNkitmJhVe"};
+let modelKey = null;
+const b64 = t => Uint8Array.from(atob(t), c => c.charCodeAt(0));
+
+async function keyFromPassword(pw) {
+  const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(pw), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey({ name: 'PBKDF2', salt: b64(LOCK.salt), iterations: LOCK.iter, hash: 'SHA-256' },
+    base, { name: 'AES-GCM', length: 256 }, true, ['decrypt']);
+}
+async function keyWorks(key) {
+  const c = b64(LOCK.check);
+  try { await crypto.subtle.decrypt({ name: 'AES-GCM', iv: c.slice(0, 12) }, key, c.slice(12)); return true; }
+  catch (e) { return false; }
+}
+function start(key) {
+  modelKey = key;
+  document.getElementById('lock').hidden = true;
+  route({ home: true });
+}
+
+const lockForm = document.getElementById('lockForm'), pwInput = document.getElementById('pw');
+const pwBtn = document.getElementById('pwBtn'), pwErr = document.getElementById('pwErr');
+lockForm.addEventListener('submit', async e => {
+  e.preventDefault();
+  pwBtn.disabled = true;
+  pwErr.textContent = '';
+  try {
+    const key = await keyFromPassword(pwInput.value);
+    if (!(await keyWorks(key))) {
+      pwErr.textContent = '密碼不正確，請再試一次。';
+      pwInput.select();
+      return;
+    }
+    // remember the key for this browser tab only, so a refresh doesn't ask again
+    try { sessionStorage.setItem('greening-key', btoa(String.fromCharCode(...new Uint8Array(await crypto.subtle.exportKey('raw', key))))); } catch (err) { /* ignore */ }
+    start(key);
+  } finally {
+    pwBtn.disabled = false;
+  }
+});
+
+(async () => {
+  statusEl.hidden = true;
+  if (!window.crypto || !crypto.subtle) {
+    pwErr.textContent = '請用 https 網址開啟這個網頁。';
+    return;
+  }
+  try {
+    const saved = sessionStorage.getItem('greening-key');
+    if (saved) {
+      const key = await crypto.subtle.importKey('raw', b64(saved), { name: 'AES-GCM' }, false, ['decrypt']);
+      if (await keyWorks(key)) { start(key); return; }
+    }
+  } catch (e) { /* ignore */ }
+  pwInput.focus();
+})();
+</script>
+</body>
+</html>
